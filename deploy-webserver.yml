@@ -1,0 +1,52 @@
+- name: Deploy Nginx Web Server
+  hosts: webservers
+  become: yes  # Run as sudo
+  tasks:
+
+    - name: Install Nginx
+      apt:
+        name: nginx
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Allow traffic on port 8080 (UFW)
+      ufw:
+        rule: allow
+        port: "8080"
+        proto: tcp
+      when: ansible_os_family == "Debian"
+
+    - name: Start and Enable Nginx
+      systemd:
+        name: nginx
+        state: started
+        enabled: yes
+
+    - name: Configure Nginx to listen on port 8080
+      copy:
+        dest: /etc/nginx/sites-available/default
+        content: |
+          server {
+              listen 8080;
+              server_name _;
+              location / {
+                  root /var/www/html;
+                  index index.html;
+              }
+          }
+      notify: Restart Nginx
+
+    - name: Copy index.html template to Web Server
+      template:
+        src: templates/index.html.j2
+        dest: /var/www/html/index.html
+        owner: www-data
+        group: www-data
+        mode: '0644'
+      
+  handlers:
+    - name: Restart Nginx
+      systemd:
+        name: nginx
+        state: restarted
+
